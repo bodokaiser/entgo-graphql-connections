@@ -24,43 +24,40 @@ func main() {
 	}
 	ctx := context.Background()
 
-	// create users
+	first := 1
 	for _, username := range usernames {
-		if _, err := CreateUser(ctx, client, username); err != nil {
-			log.Fatalf("failed creating user: %s", username)
-		}
+		MustCreateUser(ctx, client, username)
 	}
-
-	// query users
-	users, err := QueryUser(ctx, client)
-	if err != nil {
-		log.Fatalf("failed querying users: %v", err)
-	}
-	fmt.Println(printJson(users))
+	conn1 := MustQueryUser(ctx, client, &first, nil, nil, nil)
+	fmt.Println(formatJson(conn1))
+	conn2 := MustQueryUser(ctx, client, &first, nil, nil, conn1.PageInfo.EndCursor)
+	fmt.Println(formatJson(conn2))
+	conn3 := MustQueryUser(ctx, client, &first, nil, nil, conn2.PageInfo.EndCursor)
+	fmt.Println(formatJson(conn3))
 }
 
-func CreateUser(ctx context.Context, client *ent.Client, name string) (*ent.User, error) {
+func MustCreateUser(ctx context.Context, client *ent.Client, name string) *ent.User {
 	u, err := client.User.
 		Create().
 		SetName(name).
 		Save(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed creating user: %w", err)
+		panic(fmt.Errorf("failed creating user: %w", err))
 	}
-	return u, nil
+	return u
 }
 
-func QueryUser(ctx context.Context, client *ent.Client) ([]*ent.User, error) {
-	u, err := client.User.
+func MustQueryUser(ctx context.Context, client *ent.Client, first, last *int, before, after *ent.Cursor) *ent.UserConnection {
+	c, err := client.User.
 		Query().
-		All(ctx)
+		Paginate(ctx, after, first, before, last)
 	if err != nil {
-		return nil, fmt.Errorf("failed querying user: %w", err)
+		panic(fmt.Errorf("failed querying user: %w", err))
 	}
-	return u, nil
+	return c
 }
 
-func printJson(data interface{}) string {
+func formatJson(data interface{}) string {
 	b, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
 		panic(err)
